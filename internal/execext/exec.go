@@ -1,13 +1,17 @@
 package execext
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/crypto/ssh"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/shell"
@@ -28,9 +32,11 @@ var (
 	// ErrNilOptions is returned when a nil options is given
 	ErrNilOptions = errors.New("execext: nil options given")
 )
-
-// RunCommand runs a shell command
 func RunCommand(ctx context.Context, opts *RunCommandOptions) error {
+	return RunCommandOptionalRemote(ctx, opts, nil, nil, nil)
+}
+// RunCommand runs a shell command
+func RunCommandOptionalRemote(ctx context.Context, opts *RunCommandOptions, user *string, server *string, keyFilePath *string) error {
 	if opts == nil {
 		return ErrNilOptions
 	}
@@ -45,17 +51,25 @@ func RunCommand(ctx context.Context, opts *RunCommandOptions) error {
 		environ = os.Environ()
 	}
 
-	r, err := interp.New(
-		interp.Params("-e"),
-		interp.Dir(opts.Dir),
-		interp.Env(expand.ListEnviron(environ...)),
-		interp.OpenHandler(openHandler),
-		interp.StdIO(opts.Stdin, opts.Stdout, opts.Stderr),
-	)
-	if err != nil {
+	if server != nil && keyFilePath != nil && user != nil {
+		privateKey, _ := ioutil.ReadFile(*keyFilePath)
+		output, err := remoteRun(*user, *server, string(privateKey), opts.Command)
+		opts.Stdout.Write([]byte(output))
 		return err
+	} else {
+		r, err := interp.New(
+			interp.Params("-e"),
+			interp.Dir(opts.Dir),
+			interp.Env(expand.ListEnviron(environ...)),
+			interp.OpenHandler(openHandler),
+			interp.StdIO(opts.Stdin, opts.Stdout, opts.Stderr),
+		)
+		if err != nil {
+			return err
+		}
+
+		return r.Run(ctx, p)
 	}
-	return r.Run(ctx, p)
 }
 
 // IsExitError returns true the given error is an exis status error
@@ -86,4 +100,39 @@ func openHandler(ctx context.Context, path string, flag int, perm os.FileMode) (
 		return devNull{}, nil
 	}
 	return interp.DefaultOpenHandler()(ctx, path, flag, perm)
+}
+
+func remoteRun(user string, addr string, privateKey string, cmd string) (string, error) {
+	key, err := ssh.ParsePrivateKey([]byte(privateKey))
+	if err != nil {
+		return "", err
+	}
+	// Authentication
+	config := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(key),
+		},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			return nil
+		},
+	}
+
+	// Connect
+	client, err := ssh.Dial("tcp", net.JoinHostPort(addr, "22"), config)
+	if err != nil {
+		return "", err
+	}
+	// Create a session. It is one session per command.
+	session, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer session.Close()
+	var b bytes.Buffer  // import "bytes"
+	session.Stdout = &b // get output
+
+	// Finally, run the command
+	err = session.Run(cmd)
+	return b.String(), err
 }

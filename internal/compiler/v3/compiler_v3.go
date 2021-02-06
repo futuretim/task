@@ -58,7 +58,7 @@ func (c *CompilerV3) getVariables(t *taskfile.Task, call taskfile.Call, evaluate
 			if err := tr.Err(); err != nil {
 				return err
 			}
-			static, err := c.HandleDynamicVar(v, dir)
+			static, err := c.HandleDynamicVarWithRemote(v, dir, t.Remote)
 			if err != nil {
 				return err
 			}
@@ -98,6 +98,10 @@ func (c *CompilerV3) getVariables(t *taskfile.Task, call taskfile.Call, evaluate
 }
 
 func (c *CompilerV3) HandleDynamicVar(v taskfile.Var, dir string) (string, error) {
+	return c.HandleDynamicVarWithRemote(v, dir, nil)
+}
+
+func (c *CompilerV3) HandleDynamicVarWithRemote(v taskfile.Var, dir string, remote *taskfile.Remote) (string, error) {
 	if v.Static != "" || v.Sh == "" {
 		return v.Static, nil
 	}
@@ -124,8 +128,14 @@ func (c *CompilerV3) HandleDynamicVar(v taskfile.Var, dir string) (string, error
 		Stdout:  &stdout,
 		Stderr:  c.Logger.Stderr,
 	}
-	if err := execext.RunCommand(context.Background(), opts); err != nil {
-		return "", fmt.Errorf(`task: Command "%s" in taskvars file failed: %s`, opts.Command, err)
+	if remote != nil {
+		if err := execext.RunCommandOptionalRemote(context.Background(), opts, &remote.User, &remote.Server, &remote.Key); err != nil {
+			return "", fmt.Errorf(`task: Command "%s" in taskvars file failed: %s`, opts.Command, err)
+		}
+	} else {
+		if err := execext.RunCommand(context.Background(), opts); err != nil {
+			return "", fmt.Errorf(`task: Command "%s" in taskvars file failed: %s`, opts.Command, err)
+		}
 	}
 
 	// Trim a single trailing newline from the result to make most command

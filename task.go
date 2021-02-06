@@ -373,14 +373,22 @@ func (e *Executor) runCommand(ctx context.Context, t *taskfile.Task, call taskfi
 			}
 		}()
 
-		err := execext.RunCommand(ctx, &execext.RunCommandOptions{
+		var server *string
+		var keyFilePath *string
+		var user *string
+		if t.Remote != nil {
+			server = &t.Remote.Server
+			keyFilePath = &t.Remote.Key
+			user = &t.Remote.User
+		}
+		err := execext.RunCommandOptionalRemote(ctx, &execext.RunCommandOptions{
 			Command: cmd.Cmd,
 			Dir:     t.Dir,
 			Env:     getEnviron(t),
 			Stdin:   e.Stdin,
 			Stdout:  stdOut,
 			Stderr:  stdErr,
-		})
+		}, user, server, keyFilePath)
 		if execext.IsExitError(err) && cmd.IgnoreError {
 			e.Logger.VerboseErrf(logger.Yellow, "task: command error ignored: %v", err)
 			return nil

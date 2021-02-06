@@ -12,6 +12,29 @@ var (
 	ErrCantUnmarshalVar = errors.New("task: can't unmarshal var value")
 )
 
+type Remote struct {
+	Server string
+	Key string
+        User string
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (r *Remote) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var remoteStruct struct {
+		Server         string
+		Key            string
+		User           string
+	}
+	if err := unmarshal(&remoteStruct); err == nil && remoteStruct.Server != "" {
+		r.Server = remoteStruct.Server
+		r.Key = remoteStruct.Key
+		r.User = remoteStruct.User
+		return nil
+	}
+
+	return ErrCantUnmarshalCmd
+}
+
 // Vars is a string[string] variables map.
 type Vars struct {
 	Keys    []string

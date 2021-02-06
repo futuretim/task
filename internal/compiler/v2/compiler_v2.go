@@ -83,6 +83,10 @@ func (vr *varResolver) merge(vars *taskfile.Vars) {
 	vr.err = tr.Err()
 }
 
+func (c *CompilerV2) HandleDynamicVarWithRemote(v taskfile.Var, _ string, _ *taskfile.Remote) (string, error) {
+	panic("not implemented")
+}
+
 func (c *CompilerV2) HandleDynamicVar(v taskfile.Var, _ string) (string, error) {
 	if v.Static != "" || v.Sh == "" {
 		return v.Static, nil

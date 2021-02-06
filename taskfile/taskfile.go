@@ -8,6 +8,7 @@ import (
 // Taskfile represents a Taskfile.yml
 type Taskfile struct {
 	Version    string
+	Remote     *Remote
 	Expansions int
 	Output     string
 	Method     string
@@ -23,6 +24,7 @@ type Taskfile struct {
 func (tf *Taskfile) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var taskfile struct {
 		Version    string
+		Remote     *Remote
 		Expansions int
 		Output     string
 		Method     string
@@ -37,6 +39,7 @@ func (tf *Taskfile) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return err
 	}
 	tf.Version = taskfile.Version
+	tf.Remote = taskfile.Remote
 	tf.Expansions = taskfile.Expansions
 	tf.Output = taskfile.Output
 	tf.Method = taskfile.Method
@@ -54,6 +57,13 @@ func (tf *Taskfile) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	if tf.Env == nil {
 		tf.Env = &Vars{}
+	}
+	if tf.Remote != nil {
+		for _, tsk := range tf.Tasks {
+			if tsk.Remote == nil {
+				tsk.Remote = tf.Remote
+			}
+		}
 	}
 	return nil
 }

@@ -10,6 +10,7 @@ type Tasks map[string]*Task
 // Task represents a task
 type Task struct {
 	Task          string
+	Remote        *Remote
 	Cmds          []*Cmd
 	Deps          []*Dep
 	Label         string
@@ -56,6 +57,7 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var task struct {
 		Cmds          []*Cmd
 		Deps          []*Dep
+		Remote        *Remote
 		Label         string
 		Desc          string
 		Summary       string
@@ -73,6 +75,7 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	if err := unmarshal(&task); err == nil {
 		t.Cmds = task.Cmds
+		t.Remote = task.Remote
 		t.Deps = task.Deps
 		t.Label = task.Label
 		t.Desc = task.Desc

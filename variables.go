@@ -47,6 +47,7 @@ func (e *Executor) compiledTask(call taskfile.Call, evaluateShVars bool) (*taskf
 
 	new := taskfile.Task{
 		Task:        origTask.Task,
+		Remote:      origTask.Remote,
 		Label:       r.Replace(origTask.Label),
 		Desc:        r.Replace(origTask.Desc),
 		Summary:     r.Replace(origTask.Summary),
